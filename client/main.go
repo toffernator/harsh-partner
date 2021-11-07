@@ -25,37 +25,40 @@ var (
 func main() {
    flag.Parse();
 
-   log.Printf("[%s] Trying to subscribe to %s", *nameFlag, *addressFlag)
+   log.Printf("[%s] Trying to connect to %s", *nameFlag, *addressFlag)
    conn, err := grpc.Dial(*addressFlag, grpc.WithInsecure(), grpc.WithBlock())
    defer conn.Close()
    if err != nil {
       log.Fatalf("[%s] Unable to connect: %v", *nameFlag, err)
    }
+   log.Printf("[%s] Connected to %s [%d]", *nameFlag, *addressFlag, myLamport.Read())
 
    client := api.NewChatServiceClient(conn)
    subscribe(client)
 }
 
 func subscribe(client api.ChatServiceClient) {
-   ctx := context.Background()
-
    myLamport.Tick();
+   log.Printf("[%s] Trying to subscribe to %s [%d]", *nameFlag, *addressFlag, myLamport.Read())
+   ctx := context.Background()
 
    subscribeReq := &api.SubscribeReq{
       SubscriberId: *nameFlag,
       Lamport: &api.Lamport{Time: myLamport.Read()},
    }
+
    messageStream, err := client.Subscribe(ctx, subscribeReq)
    if err != nil {
       log.Fatalf("[%s] Could not subscribe: %v", *nameFlag, err)
    }
 
-   go consumeMsgStream(messageStream)
+   consumeMsgStream(messageStream)
 }
 
 func consumeMsgStream(stream api.ChatService_SubscribeClient) {
    for {
-      msg, err := stream.Recv()
+      var msg api.Message
+      err := stream.RecvMsg(&msg)
       if err == nil {
          myLamport.TickAgainst(msg.Lamport.GetTime())
          log.Printf("[%s] Recieved: %s [%d]", *nameFlag, msg.Content, msg.Lamport.Time)
