@@ -4,8 +4,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
-	"math/rand"
+   "time"
 
 	"chkg.com/chitty-chat/api"
 	"chkg.com/chitty-chat/lamport"
@@ -18,7 +19,7 @@ const (
 
 var (
    nameFlag = flag.String("name", randomName(), "Enter the name that you want to use in chitty-chat. It must be unique")
-   addressFlag = flag.String("address", address, "Enter the IP address of the chat server that you want to connect to")
+   addressFlag = flag.String("address", address, "Enter the address of the chat server that you want to connect to")
    myLamport = lamport.LamportClock{}
 )
 
@@ -52,18 +53,21 @@ func subscribe(client api.ChatServiceClient) {
       log.Fatalf("[%s] Could not subscribe: %v", *nameFlag, err)
    }
 
-   consumeMsgStream(messageStream)
+   log.Printf("[%s] Subscribed to %s [%d]", *nameFlag, *addressFlag, myLamport.Read())
+   listen(messageStream)
 }
 
-func consumeMsgStream(stream api.ChatService_SubscribeClient) {
+func listen(stream api.ChatService_SubscribeClient) {
    for {
-      var msg api.Message
-      err := stream.RecvMsg(&msg)
-      if err == nil {
+      msg, err := stream.Recv()
+      if err == io.EOF {
+         // Wait before polling the stream again
+         time.Sleep(time.Second)
+      } else if err != nil {
+         log.Fatalf("[%s] Failed to read incoming messages: %v", *nameFlag, err)
+      } else if &msg != nil {
          myLamport.TickAgainst(msg.Lamport.GetTime())
          log.Printf("[%s] Recieved: %s [%d]", *nameFlag, msg.Content, msg.Lamport.Time)
-      } else {
-         log.Fatalf("[%s] Failed to read incoming messages: %v", *nameFlag, err)
       }
    }
 }
@@ -74,5 +78,5 @@ func consumeMsgStream(stream api.ChatService_SubscribeClient) {
 
 func randomName() string {
    somename := "Ben, the Destroyer of Worlds"
-   return fmt.Sprintf("%s-%d", somename, rand.Int())
+   return fmt.Sprintf("%s-%d", somename, time.Now().Unix())
 }

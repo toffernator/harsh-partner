@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+   "fmt"
 	"log"
 	"net"
 
@@ -59,22 +60,20 @@ func main() {
 
 func (c *ChatServiceServer) Subscribe(in *api.SubscribeReq, subscribeServer api.ChatService_SubscribeServer) error {
    c.lamport.Tick()
-   log.Printf("[%s] Recieving a 'Subscribe' message from %s [%d]", c.Name, in.SubscriberId, c.lamport.Read())
+   log.Printf("[%s] Receiving a 'Subscribe' message from %s [%d]", c.Name, in.SubscriberId, c.lamport.Read())
 
    c.clients[in.SubscriberId] = subscribeServer;
 
-   return nil
-}
-
-func (c *ChatServiceServer) broadcast(msg *api.Message) error {
-   for _, client := range c.clients {
-      if err := client.Send(msg); err != nil {
-         return err;
-      }
+   msg := &api.Message{
+      Lamport: &api.Lamport{Time: c.lamport.Read()},
+      Content: fmt.Sprintf("%s subscribed! Say hello!", in.SubscriberId),
    }
+
+   c.broadcast(msg)
+
+   // FIXME: Server is being blocked or streams are being closed. Not sure...
    return nil
 }
-
 func (c *ChatServiceServer) Unsubscribe(context.Context, *api.UnsubscribeReq) (*api.UnsubscribeResp, error) {
    return nil, errors.New("Unsubscribe is not yet implemented")
 }
@@ -83,3 +82,14 @@ func (c *ChatServiceServer) Publish(context.Context, *api.Message) (*api.Publish
    return nil, errors.New("Unsubscribe is not yet implemented")
 }
 
+func (c *ChatServiceServer) broadcast(msg *api.Message) error {
+   for name, client := range c.clients {
+      c.lamport.Tick()
+      log.Printf("[%s] Broadcasting to %s [%d]", c.Name, name, c.lamport.Read())
+
+      if err := client.Send(msg); err != nil {
+         return err;
+      }
+   }
+   return nil
+}
