@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+option go_package = "chkg.com/chitty-chat/api";
+
+message Lamport {
+  uint32 time = 1;
+  uint32 nodeId = 2;
+}
+
+message Message {
+  Lamport lamport = 1;
+  string content = 2;
+}
+
+enum Status {
+  OK = 0;
+  ERR = 1;
+}
+
+message PublishResp {
+  Lamport lamport = 1;
+  Status status = 2;
+}
+
+message SubscribeReq {
+  Lamport lamport = 1;
+  uint32 subscriberId = 2;
+}
+
+message UnsubscribeReq {
+  Lamport lamport = 1;
+  uint32 subscriberId = 2;
+}
+
+message UnsubscribeResp {
+  Lamport lamport = 1;
+  Status status = 2;
+}
+
+service ChatService {
+  rpc Subscribe(SubscribeReq) returns (stream Message);
+  rpc Unsubscrib(UnsubscribeReq) returns (UnsubscribeResp);
+  rpc Publish(Message) returns (PublishResp);
+}
