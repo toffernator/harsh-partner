@@ -28,7 +28,7 @@ type ChatServiceServer struct {
    api.UnimplementedChatServiceServer
    Name string
    lamport lamport.LamportClock
-   clients map[string]api.ChatService_SubscribeServer
+   clients map[string]chan *api.Message
 }
 
 func main() {
@@ -36,7 +36,7 @@ func main() {
    chatServer := ChatServiceServer{
       Name: somename,
       lamport: lamport.LamportClock{},
-      clients: map[string]api.ChatService_SubscribeServer{},
+      clients: make(map[string](chan *api.Message)),
    }
 
    api.RegisterChatServiceServer(grpcServer, &chatServer)
@@ -62,18 +62,29 @@ func (c *ChatServiceServer) Subscribe(in *api.SubscribeReq, subscribeServer api.
    c.lamport.Tick()
    log.Printf("[%s] Receiving a 'Subscribe' message from %s [%d]", c.Name, in.SubscriberId, c.lamport.Read())
 
-   c.clients[in.SubscriberId] = subscribeServer;
+   // Using a goroutine to see if the server is being blocked somehow
+   msgs := make(chan *api.Message)
+   go notifySubscription(msgs, subscribeServer)
+
+   c.clients[in.SubscriberId] = msgs;
 
    msg := &api.Message{
       Lamport: &api.Lamport{Time: c.lamport.Read()},
       Content: fmt.Sprintf("%s subscribed! Say hello!", in.SubscriberId),
    }
-
    c.broadcast(msg)
 
    // FIXME: Server is being blocked or streams are being closed. Not sure...
    return nil
 }
+
+func notifySubscription(msgs chan *api.Message, subscriptionServer api.ChatService_SubscribeServer) {
+   for {
+      msg := <- msgs
+      subscriptionServer.Send(msg)
+   }
+}
+
 func (c *ChatServiceServer) Unsubscribe(context.Context, *api.UnsubscribeReq) (*api.UnsubscribeResp, error) {
    return nil, errors.New("Unsubscribe is not yet implemented")
 }
@@ -83,13 +94,10 @@ func (c *ChatServiceServer) Publish(context.Context, *api.Message) (*api.Publish
 }
 
 func (c *ChatServiceServer) broadcast(msg *api.Message) error {
-   for name, client := range c.clients {
+   for clientId, clientChannel := range c.clients {
       c.lamport.Tick()
-      log.Printf("[%s] Broadcasting to %s [%d]", c.Name, name, c.lamport.Read())
-
-      if err := client.Send(msg); err != nil {
-         return err;
-      }
+      log.Printf("[%s] Broadcasting to %s [%d]", c.Name, clientId, c.lamport.Read())
+      clientChannel <- msg
    }
    return nil
 }
