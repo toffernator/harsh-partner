@@ -19,7 +19,7 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ChatServiceClient interface {
 	Subscribe(ctx context.Context, in *SubscribeReq, opts ...grpc.CallOption) (ChatService_SubscribeClient, error)
-	Unsubscrib(ctx context.Context, in *UnsubscribeReq, opts ...grpc.CallOption) (*UnsubscribeResp, error)
+	Unsubscribe(ctx context.Context, in *UnsubscribeReq, opts ...grpc.CallOption) (*UnsubscribeResp, error)
 	Publish(ctx context.Context, in *Message, opts ...grpc.CallOption) (*PublishResp, error)
 }
 
@@ -63,9 +63,9 @@ func (x *chatServiceSubscribeClient) Recv() (*Message, error) {
 	return m, nil
 }
 
-func (c *chatServiceClient) Unsubscrib(ctx context.Context, in *UnsubscribeReq, opts ...grpc.CallOption) (*UnsubscribeResp, error) {
+func (c *chatServiceClient) Unsubscribe(ctx context.Context, in *UnsubscribeReq, opts ...grpc.CallOption) (*UnsubscribeResp, error) {
 	out := new(UnsubscribeResp)
-	err := c.cc.Invoke(ctx, "/ChatService/Unsubscrib", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/ChatService/Unsubscribe", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func (c *chatServiceClient) Publish(ctx context.Context, in *Message, opts ...gr
 // for forward compatibility
 type ChatServiceServer interface {
 	Subscribe(*SubscribeReq, ChatService_SubscribeServer) error
-	Unsubscrib(context.Context, *UnsubscribeReq) (*UnsubscribeResp, error)
+	Unsubscribe(context.Context, *UnsubscribeReq) (*UnsubscribeResp, error)
 	Publish(context.Context, *Message) (*PublishResp, error)
 	mustEmbedUnimplementedChatServiceServer()
 }
@@ -98,8 +98,8 @@ type UnimplementedChatServiceServer struct {
 func (UnimplementedChatServiceServer) Subscribe(*SubscribeReq, ChatService_SubscribeServer) error {
 	return status.Errorf(codes.Unimplemented, "method Subscribe not implemented")
 }
-func (UnimplementedChatServiceServer) Unsubscrib(context.Context, *UnsubscribeReq) (*UnsubscribeResp, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Unsubscrib not implemented")
+func (UnimplementedChatServiceServer) Unsubscribe(context.Context, *UnsubscribeReq) (*UnsubscribeResp, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Unsubscribe not implemented")
 }
 func (UnimplementedChatServiceServer) Publish(context.Context, *Message) (*PublishResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Publish not implemented")
@@ -138,20 +138,20 @@ func (x *chatServiceSubscribeServer) Send(m *Message) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func _ChatService_Unsubscrib_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ChatService_Unsubscribe_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UnsubscribeReq)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ChatServiceServer).Unsubscrib(ctx, in)
+		return srv.(ChatServiceServer).Unsubscribe(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/ChatService/Unsubscrib",
+		FullMethod: "/ChatService/Unsubscribe",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ChatServiceServer).Unsubscrib(ctx, req.(*UnsubscribeReq))
+		return srv.(ChatServiceServer).Unsubscribe(ctx, req.(*UnsubscribeReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -182,8 +182,8 @@ var ChatService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*ChatServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "Unsubscrib",
-			Handler:    _ChatService_Unsubscrib_Handler,
+			MethodName: "Unsubscribe",
+			Handler:    _ChatService_Unsubscribe_Handler,
 		},
 		{
 			MethodName: "Publish",

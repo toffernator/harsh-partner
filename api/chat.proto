@@ -39,6 +39,6 @@ message UnsubscribeResp {
 
 service ChatService {
   rpc Subscribe(SubscribeReq) returns (stream Message);
-  rpc Unsubscrib(UnsubscribeReq) returns (UnsubscribeResp);
+  rpc Unsubscribe(UnsubscribeReq) returns (UnsubscribeResp);
   rpc Publish(Message) returns (PublishResp);
 }
