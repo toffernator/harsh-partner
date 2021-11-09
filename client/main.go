@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"io"
 	"log"
-   "time"
+	"os"
+	"time"
 
 	"chkg.com/chitty-chat/api"
 	"chkg.com/chitty-chat/lamport"
+	"github.com/manifoldco/promptui"
 	"google.golang.org/grpc"
 )
 
@@ -36,6 +38,39 @@ func main() {
 
    client := api.NewChatServiceClient(conn)
    subscribe(client)
+
+   clientLoop(client)
+   unsubscribe(client)
+}
+
+func clientLoop(c api.ChatServiceClient) {
+   isLeaving := false
+
+   for !isLeaving {
+      prompt := promptui.Select{
+         Label: "Choose an option",
+         Items: []string{"Publish", "Leave"},
+      }
+
+      _, result, err := prompt.Run()
+      if err != nil {
+         log.Fatalf("[%s] User Prompt failed with error: %v [%d]", *addressFlag, err, myLamport.Read())
+      }
+
+      isLeaving = result == "Leave"
+      if !isLeaving {
+         msgPrompt := promptui.Prompt{
+            Label: "> ",
+         }
+
+         msg, err := msgPrompt.Run()
+         if err != nil {
+            log.Fatalf("[%s] Message Prompt failed with error: %v [%d]", *addressFlag, err, myLamport.Read())
+         }
+
+         publish(c, msg)
+      }
+   }
 }
 
 func subscribe(client api.ChatServiceClient) {
@@ -54,7 +89,7 @@ func subscribe(client api.ChatServiceClient) {
    }
 
    log.Printf("[%s] Subscribed to %s [%d]", *nameFlag, *addressFlag, myLamport.Read())
-   listen(messageStream)
+   go listen(messageStream)
 }
 
 func listen(stream api.ChatService_SubscribeClient) {
@@ -72,9 +107,52 @@ func listen(stream api.ChatService_SubscribeClient) {
    }
 }
 
-// Unsubscribe
+func unsubscribe(c api.ChatServiceClient) {
+   myLamport.Tick()
+   log.Printf("[%s] Trying to unsubscribe from %s [%d]", *nameFlag, *addressFlag, myLamport.Read())
 
-// Publish
+   ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+   defer cancel()
+
+   resp, err := c.Unsubscribe(ctx, &api.UnsubscribeReq{
+      Lamport: &myLamport.Lamport,
+      SubscriberId: *nameFlag,
+   })
+
+   if err != nil {
+      log.Fatalf("Failed to unsubscribe from %s with error: %v", *addressFlag, err)
+   }
+
+   if resp.Status != api.Status_OK {
+      log.Fatalf("Could not unsubscribe from %s with server response: %s", *addressFlag, resp.Status)
+   }
+   myLamport.TickAgainst(resp.Lamport.Time)
+   log.Printf("[%s] Unsubscribed. Closing the application [%d]", *nameFlag, myLamport.Read())
+   os.Exit(0)
+}
+
+func publish(c api.ChatServiceClient, msg string) {
+   myLamport.Tick()
+   log.Printf("[%s] Trying to publish to %s [%d]", *nameFlag, *addressFlag, myLamport.Read())
+
+   ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+   defer cancel()
+
+   resp, err := c.Publish(ctx, &api.Message{
+      Lamport: &myLamport.Lamport,
+      Content: msg,
+   })
+
+   if err != nil {
+      log.Fatalf("Failed to publish to %s with error: %v", *addressFlag, err)
+   }
+
+   if resp.Status != api.Status_OK {
+      log.Fatalf("Could not publish to %s with server response: %s", *addressFlag, resp.Status)
+   }
+
+   myLamport.TickAgainst(resp.Lamport.Time)
+}
 
 func randomName() string {
    somename := "Ben, the Destroyer of Worlds"

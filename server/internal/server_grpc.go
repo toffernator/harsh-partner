@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 
@@ -52,6 +51,14 @@ func (c *ChatServiceServer) Unsubscribe(ctx context.Context, in *api.Unsubscribe
    }, nil
 }
 
-func (c *ChatServiceServer) Publish(context.Context, *api.Message) (*api.PublishResp, error) {
-   return nil, errors.New("Unsubscribe is not yet implemented")
+func (c *ChatServiceServer) Publish(ctx context.Context, msg *api.Message) (*api.PublishResp, error) {
+   c.Lamport.TickAgainst(msg.Lamport.Time)
+   log.Println(c.FmtMsg("Recieving 'Publish'"))
+
+   c.Broadcast(msg.Content)
+
+   return &api.PublishResp{
+      Lamport: &c.Lamport.Lamport,
+      Status: api.Status_OK,
+   }, nil
 }
