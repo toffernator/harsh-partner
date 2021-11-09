@@ -7,10 +7,11 @@ import (
    "fmt"
 	"log"
 	"net"
+   "sync"
 
 	"chkg.com/chitty-chat/api"
 	"chkg.com/chitty-chat/lamport"
-   "google.golang.org/grpc"
+	"google.golang.org/grpc"
 )
 
 const (
@@ -25,10 +26,21 @@ var (
 )
 
 type ChatServiceServer struct {
-   api.UnimplementedChatServiceServer
    Name string
    lamport lamport.LamportClock
-   clients map[string]chan *api.Message
+   subscribers map[string]broadcastSubscriber
+   subscriberMutex sync.Mutex
+
+   api.UnimplementedChatServiceServer
+}
+
+// Subscriber pattern is adapted from: github.com/omri86/longlived-grpc
+type broadcastSubscriber struct {
+   id string
+   // stream is the server side of the RPC stream
+   stream api.ChatService_SubscribeServer
+   // finished is used to signal the closure of a client subscribing goroutine
+   finished chan<-bool
 }
 
 func main() {
@@ -36,7 +48,7 @@ func main() {
    chatServer := ChatServiceServer{
       Name: somename,
       lamport: lamport.LamportClock{},
-      clients: make(map[string](chan *api.Message)),
+      subscribers: map[string]broadcastSubscriber{},
    }
 
    api.RegisterChatServiceServer(grpcServer, &chatServer)
@@ -58,30 +70,32 @@ func main() {
    }
 }
 
-func (c *ChatServiceServer) Subscribe(in *api.SubscribeReq, subscribeServer api.ChatService_SubscribeServer) error {
+
+func (c *ChatServiceServer) Subscribe(in *api.SubscribeReq, stream api.ChatService_SubscribeServer) error {
    c.lamport.Tick()
    log.Printf("[%s] Receiving a 'Subscribe' message from %s [%d]", c.Name, in.SubscriberId, c.lamport.Read())
 
-   // Using a goroutine to see if the server is being blocked somehow
-   msgs := make(chan *api.Message)
-   go notifySubscription(msgs, subscribeServer)
-
-   c.clients[in.SubscriberId] = msgs;
-
-   msg := &api.Message{
-      Lamport: &api.Lamport{Time: c.lamport.Read()},
-      Content: fmt.Sprintf("%s subscribed! Say hello!", in.SubscriberId),
+   fin := make(chan bool)
+   subscriber := broadcastSubscriber{
+      stream: stream,
+      finished: fin,
    }
+
+   c.subscribers[in.SubscriberId] = subscriber
+   msg := fmt.Sprintf("%s is now subscribed to the server", in.SubscriberId)
    c.broadcast(msg)
 
-   // FIXME: Server is being blocked or streams are being closed. Not sure...
-   return nil
-}
-
-func notifySubscription(msgs chan *api.Message, subscriptionServer api.ChatService_SubscribeServer) {
+   ctx := stream.Context()
+   // Keeps this scope alive because once it is exited the stream is closed
+   // Use the finished channel to kill the stream e.g. when a subscriber
+   // unsubscribes
    for {
-      msg := <- msgs
-      subscriptionServer.Send(msg)
+      select {
+      case <- fin:
+      case <- ctx.Done():
+         log.Printf("[%s] Closing subscription for %s [%d]", c.Name, in.SubscriberId, c.lamport.Read())
+         return nil
+      }
    }
 }
 
@@ -93,11 +107,34 @@ func (c *ChatServiceServer) Publish(context.Context, *api.Message) (*api.Publish
    return nil, errors.New("Unsubscribe is not yet implemented")
 }
 
-func (c *ChatServiceServer) broadcast(msg *api.Message) error {
-   for clientId, clientChannel := range c.clients {
+// broadcast will send a Message to the open streams of all subscribers of a
+// ChatServiceServer
+func (c *ChatServiceServer) broadcast(msg string) error {
+   for _, subscriber := range c.subscribers {
+      contents := fmt.Sprintf("[%s] %s [%d]", c.Name, msg, c.lamport.Read())
+      msgPayload := &api.Message{
+         Content: contents,
+         Lamport: &api.Lamport{Time: c.lamport.Read()},
+      }
+
+      subscriber.stream.Send(msgPayload)
       c.lamport.Tick()
-      log.Printf("[%s] Broadcasting to %s [%d]", c.Name, clientId, c.lamport.Read())
-      clientChannel <- msg
    }
    return nil
+}
+
+// addSubscriber adds a new subscriber to the server concurrently
+func (c *ChatServiceServer) addSubscriber(subscriber broadcastSubscriber) {
+   c.subscriberMutex.Lock()
+   defer c.subscriberMutex.Unlock()
+
+   c.subscribers[subscriber.id] = subscriber
+}
+
+// removeSubscriber removes a new subscriber from the server concurrently
+func (c *ChatServiceServer) removeSubscriber(id string) {
+   c.subscriberMutex.Lock()
+   defer c.subscriberMutex.Unlock()
+
+   delete(c.subscribers, id);
 }
