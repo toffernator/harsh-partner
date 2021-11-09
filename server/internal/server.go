@@ -2,6 +2,7 @@ package server
 
 import (
    "fmt"
+   "log"
 	"sync"
 
 	"chkg.com/chitty-chat/api"
@@ -34,15 +35,17 @@ func (c *ChatServiceServer) AddSubscriber(s Subscriber) {
    c.subscriberMutex.Lock()
    defer c.subscriberMutex.Unlock()
 
+   c.Lamport.Tick()
    c.subscribers[s.Id] = s
 }
 
 // RemoveSubscriber removes a subscriber from the server, respecting concurrent
 // resource access.
-func (c *ChatServiceServer) removeSubscriber(id string) {
+func (c *ChatServiceServer) RemoveSubscriber(id string) {
    c.subscriberMutex.Lock()
    defer c.subscriberMutex.Unlock()
 
+   c.Lamport.Tick()
    delete(c.subscribers, id);
 }
 
@@ -50,13 +53,14 @@ func (c *ChatServiceServer) removeSubscriber(id string) {
 // c.
 func (c *ChatServiceServer) Broadcast(msg string) error {
    for _, subscriber := range c.subscribers {
+      c.Lamport.Tick()
       msg := &api.Message{
          Content: msg,
          Lamport: &api.Lamport{Time: c.Lamport.Read()},
       }
 
+      log.Println(c.FmtMsgf("Broadcasting to %s", subscriber.Id))
       subscriber.Stream.Send(msg)
-      c.Lamport.Tick()
    }
    return nil
 }

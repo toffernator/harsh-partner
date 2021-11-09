@@ -1,16 +1,17 @@
 package server
 
 import (
-   "context"
-   "errors"
-   "log"
+	"context"
+	"errors"
+	"fmt"
+	"log"
 
-   "chkg.com/chitty-chat/api"
+	"chkg.com/chitty-chat/api"
 )
 
 
 func (c *ChatServiceServer) Subscribe(in *api.SubscribeReq, stream api.ChatService_SubscribeServer) error {
-   c.Lamport.Tick()
+   c.Lamport.TickAgainst(in.Lamport.Time)
    log.Println(c.FmtMsgf("Recieving 'Subscribe' from %s", in.SubscriberId))
 
    finished := make(chan bool)
@@ -21,6 +22,7 @@ func (c *ChatServiceServer) Subscribe(in *api.SubscribeReq, stream api.ChatServi
    }
    c.AddSubscriber(sub)
    log.Println(c.FmtMsgf("%s is now subscribed to the server", sub.Id))
+   c.Broadcast(fmt.Sprintf("%s has joined, say hello!", sub.Id))
 
    // Keeps this scope alive because once it is exited the stream is closed
    // Use the finished channel to kill the stream e.g. when a subscriber
@@ -36,8 +38,18 @@ func (c *ChatServiceServer) Subscribe(in *api.SubscribeReq, stream api.ChatServi
    }
 }
 
-func (c *ChatServiceServer) Unsubscribe(context.Context, *api.UnsubscribeReq) (*api.UnsubscribeResp, error) {
-   return nil, errors.New("Unsubscribe is not yet implemented")
+func (c *ChatServiceServer) Unsubscribe(ctx context.Context, in *api.UnsubscribeReq) (*api.UnsubscribeResp, error) {
+   c.Lamport.TickAgainst(in.Lamport.Time)
+   log.Println(c.FmtMsgf("Recieving 'Unsubscribe' from %s", in.SubscriberId))
+
+   c.RemoveSubscriber(in.SubscriberId)
+   log.Println(c.FmtMsgf("%s has unsubscribed from the server", in.SubscriberId))
+   c.Broadcast(fmt.Sprintf("%s has joined, say hello!", in.SubscriberId))
+
+   return &api.UnsubscribeResp{
+      Lamport: &c.Lamport.Lamport,
+      Status: api.Status_OK,
+   }, nil
 }
 
 func (c *ChatServiceServer) Publish(context.Context, *api.Message) (*api.PublishResp, error) {

@@ -67,7 +67,7 @@ func listen(stream api.ChatService_SubscribeClient) {
          log.Fatalf("[%s] Failed to read incoming messages: %v", *nameFlag, err)
       } else if &msg != nil {
          myLamport.TickAgainst(msg.Lamport.GetTime())
-         log.Printf("[%s] Recieved: %s [%d]", *nameFlag, msg.Content, msg.Lamport.Time)
+         log.Printf("[%s] Recieved: %s [%d]", *nameFlag, msg.Content, myLamport.Read())
       }
    }
 }
