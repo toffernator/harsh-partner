@@ -1,0 +1,8 @@
+Makefile
+Dockerfile
+
+bin/
+
+api/doc
+api/chat.proto
+

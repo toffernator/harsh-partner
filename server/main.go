@@ -10,22 +10,22 @@ import (
 
 const (
    somename = "Susan"
-   address = "localhost:4042"
+   port = ":4042"
 )
 
 var (
    nameFlag = flag.String("name", somename, "The name by which to recognize the server")
-   addressFlag = flag.String("address", address, "The address on which to host the server")
+   portFlag = flag.String("port", port, "The port on which to host the server")
 )
 
 func main() {
    grpcServer, chatServer := server.NewGrpcServer(*nameFlag)
 
 
-   // Listen to requests from the specified address
-   lis, err := net.Listen("tcp", address)
+   // Listen to requests from the specified port
+   lis, err := net.Listen("tcp", port)
    if err != nil {
-      log.Fatalf(chatServer.FmtMsgf("Failed to listen on %s with error: %v", address, err))
+      log.Fatalf(chatServer.FmtMsgf("Failed to listen on %s with error: %v", port, err))
    }
    defer func() {
       lis.Close()
