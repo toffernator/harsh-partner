@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	client "chkg.com/chitty-chat/client/internal"
+   client "github.com/toffernator/harsh-partner/client/internal"
 	"github.com/manifoldco/promptui"
 	"google.golang.org/grpc"
 )

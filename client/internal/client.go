@@ -8,8 +8,8 @@ import (
    "os"
    "time"
 
-   "chkg.com/chitty-chat/api"
-   "chkg.com/chitty-chat/lamport"
+   "github.com/toffernator/harsh-partner/api"
+   "github.com/toffernator/harsh-partner/lamport"
 	"google.golang.org/grpc"
 )
 

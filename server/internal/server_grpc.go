@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"chkg.com/chitty-chat/api"
+   "github.com/toffernator/harsh-partner/api"
 )
 
 

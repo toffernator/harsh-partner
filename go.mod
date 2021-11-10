@@ -1,4 +1,4 @@
-module chkg.com/chitty-chat
+module github.com/toffernator/harsh-partner
 
 go 1.17
 

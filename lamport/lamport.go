@@ -2,7 +2,7 @@ package lamport
 
 import (
    "sync"
-   "chkg.com/chitty-chat/api"
+   "github.com/toffernator/harsh-partner/api"
 )
 
 type LamportClock struct {

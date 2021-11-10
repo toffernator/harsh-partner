@@ -5,7 +5,7 @@ import (
 	"log"
 	"net"
 
-	"chkg.com/chitty-chat/server/internal"
+	"github.com/toffernator/harsh-partner/server/internal"
 )
 
 const (

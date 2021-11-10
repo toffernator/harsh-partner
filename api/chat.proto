@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package = "chkg.com/chitty-chat/api";
+option go_package = "github.com/toffernator/harsh-partner/api";
 
 message Lamport {
   uint32 time = 1;
